@@ -1,0 +1,110 @@
+#include <AP_Common/AP_Common.h>
+#include <AP_Math/AP_Math.h>
+#include <AP_Param/AP_Param.h>
+#include <AP_Progmem/AP_Progmem.h>
+#include <AP_HAL/AP_HAL.h>
+#include <AP_GPS/AP_GPS.h>
+#include <AP_ADC/AP_ADC.h>
+#include <AP_AHRS/AP_AHRS.h>
+#include <AP_Motors/AP_Motors.h>
+#include <AP_RangeFinder/AP_RangeFinder.h>
+#include <AP_Logger/AP_Logger.h>
+#include <AP_Mission/AP_Mission.h>
+#include <AP_Baro/AP_Baro.h>
+#include <AP_InertialSensor/AP_InertialSensor.h>
+#include <AP_Notify/AP_Notify.h>
+#include <AP_HAL_VRBRAIN/AP_HAL_VRBRAIN.h>
+#include <AP_Vehicle/AP_Vehicle.h>
+
+const AP_HAL::HAL& hal = AP_HAL_BOARD_DRIVER;
+
+// define home location
+static const struct Location home = {
+    .lat = -35.363260,
+    .lng = 149.165230,
+    .alt = 584.9,
+    .relative_alt = 0
+};
+
+// define waypoints
+static const struct Location waypoints[] = {
+    { .lat = -35.363260, .lng = 149.165230, .alt = 100, .relative_alt = 0 },
+    { .lat = -35.362000, .lng = 149.165230, .alt = 100, .relative_alt = 0 },
+    { .lat = -35.362000, .lng = 149.166000, .alt = 100, .relative_alt = 0 }
+};
+
+static const uint8_t num_waypoints = sizeof(waypoints) / sizeof(Location);
+
+// setup function
+void setup()
+{
+    // initialize HAL
+    hal.init();
+
+    // initialize GPS
+    AP_GPS::init(hal.uartA, SERIAL0);
+
+    // initialize AHRS
+    AP_InertialSensor::init();
+
+    // wait for AHRS to be healthy
+    while (!AP_InertialSensor::healthy()) {
+        hal.scheduler->delay(100);
+    }
+}
+
+// main loop
+void loop()
+{
+    // read GPS
+    AP_GPS::read();
+
+    // wait for GPS fix
+    if (!AP_GPS::gps().lock) {
+        return;
+    }
+
+    // get current location
+    Location current = AP_GPS::gps().location;
+
+    // calculate distance to home
+    float distance_to_home = AP_GPS::gps().distance_cm(&home);
+
+    // check if close to home
+    if (distance_to_home < 50) {
+        // do something when close to home
+    }
+
+    // find nearest waypoint
+    int nearest_waypoint = AP_GPS::gps().nearest_waypoint(waypoints, num_waypoints);
+
+    // navigate to nearest waypoint
+    navigate_to_waypoint(waypoints[nearest_waypoint]);
+}
+
+// function to navigate to a waypoint
+void navigate_to_waypoint(const Location& waypoint)
+{
+    // calculate distance to waypoint
+    float distance_to_waypoint = AP_GPS::gps().distance_cm(&waypoint);
+
+    // check if close to waypoint
+    if (distance_to_waypoint < 50) {
+        // do something when close to waypoint
+    }
+
+    // calculate heading to waypoint
+    float heading_to_waypoint = AP_GPS::gps().course_to(&waypoint);
+
+    // set desired heading
+    AP_Motors.set_desired_heading(heading_to_waypoint);
+
+    // set throttle to maintain altitude
+    AP_Motors.set_throttle(AP_AHRS::get_nav_throttle());
+
+    // set servo outputs
+    AP_Motors.set_servos_4(0);
+}
+
+// main function
+AP_HAL_MAIN();
